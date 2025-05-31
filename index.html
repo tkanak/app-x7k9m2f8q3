@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Protein Tracker</title>
+    <link rel="manifest" href="data:application/json,{%22name%22:%22Protein%20Tracker%22,%22short_name%22:%22ProteinTracker%22,%22theme_color%22:%221a1a2e%22,%22background_color%22:%220f0f23%22,%22display%22:%22standalone%22,%22orientation%22:%22portrait%22}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f23;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .app-container {
+            max-width: 430px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f23 100%);
+            position: relative;
+            padding-bottom: 80px;
+        }
+
+        header {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .daily-summary {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .daily-summary::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .protein-amount {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+        }
+
+        .protein-label {
+            color: #8b8b9e;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .add-meal-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 20px;
+            width: calc(100% - 40px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .add-meal-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .add-meal-btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .add-meal-btn:active {
+            transform: scale(0.98);
+        }
+
+        .meals-list {
+            padding: 0 20px;
+        }
+
+        .meal-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .meal-item:active {
+            transform: scale(0.98);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .meal-info h3 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .meal-info p {
+            color: #8b8b9e;
+            font-size: 14px;
+        }
+
+        .meal-protein {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            border-radius: 30px 30px 0 0;
+            padding: 30px 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            color: #8b8b9e;
+            font-size: 14px;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .ai-insights {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            margin: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-insights h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ai-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .insights-content {
+            line-height: 1.6;
+            color: #e0e0e0;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 0;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: #8b8b9e;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+        }
+
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .supplements-section {
+            padding: 0 20px;
+            margin-top: 20px;
+        }
+
+        .supplement-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .supplement-name {
+            font-size: 14px;
+        }
+
+        .supplement-dose {
+            color: #667eea;
+            font-size: 12px;
+        }
+
+        .delete-btn {
+            background: rgba(255, 67, 54, 0.2);
+            border: 1px solid rgba(255, 67, 54, 0.5);
+            color: #ff4336;
+            border-radius: 8px;
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .delete-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 67, 54, 0.3);
+        }
+
+        /* Security features styling */
+        .security-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
+            background: #4caf50;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="security-indicator" title="Zabezpečené připojení"></div>
+            <h1>Protein Tracker 💪</h1>
+        </header>
+
+        <div class="daily-summary">
+            <div class="protein-amount" id="totalProtein">0g</div>
+            <div class="protein-label">Celkový protein dnes</div>
+        </div>
+
+        <button class="add-meal-btn" onclick="openMealModal()">+ Přidat jídlo</button>
+
+        <div class="ai-insights" id="aiInsights" style="display: none;">
+            <h2><span class="ai-icon">🤖</span>AI Doporučení</h2>
+            <div class="insights-content" id="insightsContent"></div>
+        </div>
+
+        <div class="supplements-section">
+            <h2 style="font-size: 18px; margin-bottom: 15px; padding-left: 5px;">Dnešní doplňky stravy</h2>
+            <div id="supplementsList"></div>
+        </div>
+
+        <div class="meals-list" id="mealsList"></div>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active">Přehled</button>
+            <button class="nav-item" onclick="showHistory()">Historie</button>
+            <button class="nav-item" onclick="showProfile()">Profil</button>
+        </nav>
+    </div>
+
+    <!-- Modal pro přidání jídla -->
+    <div class="modal" id="mealModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Přidat jídlo</h2>
+                <button class="close-btn" onclick="closeMealModal()">×</button>
+            </div>
+            <form id="mealForm" onsubmit="addMeal(event)">
+                <label>Název jídla</label>
+                <input type="text" id="mealName" required placeholder="např. Kuřecí prsa s rýží">
+                
+                <label>Obsah proteinu (g)</label>
+                <input type="number" id="proteinAmount" required placeholder="0" step="0.1" min="0">
+                
+                <label>Kategorie</label>
+                <select id="mealCategory">
+                    <option value="breakfast">Snídaně</option>
+                    <option value="lunch">Oběd</option>
+                    <option value="dinner">Večeře</option>
+                    <option value="snack">Svačina</option>
+                </select>
+                
+                <label>Poznámky</label>
+                <textarea id="mealNotes" rows="3" placeholder="Dodatečné informace o jídle..."></textarea>
+                
+                <button type="submit" class="submit-btn">Přidat jídlo</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal pro přidání doplňku -->
+    <div class="modal" id="supplementModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Přidat doplněk stravy</h2>
+                <button class="close-btn" onclick="closeSupplementModal()">×</button>
+            </div>
+            <form id="supplementForm" onsubmit="addSupplement(event)">
+                <label>Název doplňku</label>
+                <input type="text" id="supplementName" required placeholder="např. Whey protein">
+                
+                <label>Dávka</label>
+                <input type="text" id="supplementDose" required placeholder="např. 30g">
+                
+                <button type="submit" class="submit-btn">Přidat doplněk</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Datová struktura - vše v paměti
+        let appData = {
+            meals: [],
+            supplements: [],
+            profile: {
+                dailyProteinGoal: 60,
+                weight: 70,
+                activityLevel: 'moderate'
+            }
+        };
+
+        // Ukládání do paměti (simulace localStorage)
+        let memoryStorage = {};
+
+        // Jednoduchý hash pro simulaci zabezpečení
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString(36);
+        }
+
+        // Simulace šifrování (pro demonstrační účely)
+        function encryptData(data) {
+            const jsonString = JSON.stringify(data);
+            // Jednoduchá obfuskace pro demonstraci
+            return btoa(jsonString).split('').reverse().join('');
+        }
+
+        function decryptData(encrypted) {
+            try {
+                const decoded = encrypted.split('').reverse().join('');
+                return JSON.parse(atob(decoded));
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function saveToMemory(key, value) {
+            memoryStorage[key] = value;
+        }
+
+        function loadFromMemory(key) {
+            return memoryStorage[key] || null;
+        }
+
+        // Pokus o použití localStorage s fallbackem na paměť
+        function saveData() {
+            const encrypted = encryptData(appData);
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('proteinTrackerData', encrypted);
+                } else {
+                    saveToMemory('proteinTrackerData', encrypted);
+                }
+            } catch (e) {
+                // Fallback na paměť pokud localStorage není dostupný
+                saveToMemory('proteinTrackerData', encrypted);
+            }
+        }
+
+        function loadData() {
+            try {
+                let encrypted = null;
+                if (typeof localStorage !== 'undefined') {
+                    encrypted = localStorage.getItem('proteinTrackerData');
+                } else {
+                    encrypted = loadFromMemory('proteinTrackerData');
+                }
+                
+                if (encrypted) {
+                    const decrypted = decryptData(encrypted);
+                    if (decrypted) {
+                        appData = decrypted;
+                    }
+                }
+            } catch (e) {
+                // Použití defaultních dat při chybě
+                console.log('Data budou uložena pouze v paměti pro tuto session');
+            }
+            updateUI();
+        }
+
+        // Získání dnešních jídel
+        function getTodaysMeals() {
+            const today = new Date().toDateString();
+            return appData.meals.filter(meal => 
+                new Date(meal.timestamp).toDateString() === today
+            );
+        }
+
+        // Získání dnešních doplňků
+        function getTodaysSupplements() {
+            const today = new Date().toDateString();
+            return appData.supplements.filter(supp => 
+                new Date(supp.timestamp).toDateString() === today
+            );
+        }
+
+        // Výpočet celkového proteinu za den
+        function calculateTotalProtein() {
+            const todaysMeals = getTodaysMeals();
+            return todaysMeals.reduce((total, meal) => total + meal.protein, 0);
+        }
+
+        // Otevření modálního okna
+        function openMealModal() {
+            document.getElementById('mealModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Zavření modálního okna
+        function closeMealModal() {
+            document.getElementById('mealModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            document.getElementById('mealForm').reset();
+        }
+
+        // Přidání jídla
+        function addMeal(event) {
+            event.preventDefault();
+            
+            const meal = {
+                id: Date.now(),
+                name: sanitizeInput(document.getElementById('mealName').value),
+                protein: parseFloat(document.getElementById('proteinAmount').value),
+                category: document.getElementById('mealCategory').value,
+                notes: sanitizeInput(document.getElementById('mealNotes').value),
+                timestamp: new Date().toISOString()
+            };
+            
+            appData.meals.push(meal);
+            saveData();
+            closeMealModal();
+            updateUI();
+            generateAIInsights();
+        }
+
+        // Přidání doplňku stravy
+        function addSupplement(event) {
+            event.preventDefault();
+            
+            const supplement = {
+                id: Date.now(),
+                name: sanitizeInput(document.getElementById('supplementName').value),
+                dose: sanitizeInput(document.getElementById('supplementDose').value),
+                timestamp: new Date().toISOString()
+            };
+            
+            appData.supplements.push(supplement);
+            saveData();
+            closeSupplementModal();
+            updateUI();
+        }
+
+        function openSupplementModal() {
+            document.getElementById('supplementModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSupplementModal() {
+            document.getElementById('supplementModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            document.getElementById('supplementForm').reset();
+        }
+
+        // Smazání jídla
+        function deleteMeal(id) {
+            if (confirm('Opravdu chcete smazat toto jídlo?')) {
+                appData.meals = appData.meals.filter(meal => meal.id !== id);
+                saveData();
+                updateUI();
+                generateAIInsights();
+            }
+        }
+
+        // Smazání doplňku
+        function deleteSupplement(id) {
+            if (confirm('Opravdu chcete smazat tento doplněk?')) {
+                appData.supplements = appData.supplements.filter(supp => supp.id !== id);
+                saveData();
+                updateUI();
+            }
+        }
+
+        // AI Insights generátor
+        function generateAIInsights() {
+            const totalProtein = calculateTotalProtein();
+            const todaysMeals = getTodaysMeals();
+            const supplements = getTodaysSupplements();
+            
+            let insights = [];
+            
+            // Analýza proteinu
+            if (totalProtein < 30) {
+                insights.push("💡 Váš příjem proteinu je zatím nízký. Doporučuji přidat proteinové jídlo jako kuřecí maso, rybu nebo luštěniny.");
+            } else if (totalProtein > appData.profile.dailyProteinGoal) {
+                insights.push("✅ Výborně! Překročili jste svůj denní cíl proteinu. To podpoří regeneraci svalů.");
+            }
+            
+            // Timing jídel
+            const mealTimes = todaysMeals.map(m => new Date(m.timestamp).getHours());
+            const lastMealTime = Math.max(...mealTimes);
+            
+            if (lastMealTime < 12 && new Date().getHours() > 14) {
+                insights.push("⏰ Poslední jídlo jste měli před několika hodinami. Zvažte svačinu s proteinem pro udržení energie.");
+            }
+            
+            // Analýza doplňků
+            if (supplements.length > 0) {
+                const suppNames = supplements.map(s => s.name.toLowerCase());
+                if (suppNames.some(n => n.includes('whey') || n.includes('protein'))) {
+                    insights.push("💪 Proteinový prášek je skvělý způsob, jak doplnit denní příjem. Ideální je po tréninku.");
+                }
+                if (suppNames.some(n => n.includes('kreatin') || n.includes('creatine'))) {
+                    insights.push("⚡ Kreatin podporuje sílu a výkon. Nezapomeňte pít dostatek vody!");
+                }
+            }
+            
+            // Zobrazení insights
+            const insightsDiv = document.getElementById('aiInsights');
+            const insightsContent = document.getElementById('insightsContent');
+            
+            if (insights.length > 0) {
+                insightsDiv.style.display = 'block';
+                insightsContent.innerHTML = insights.join('<br><br>');
+            } else {
+                insightsDiv.style.display = 'none';
+            }
+        }
+
+        // Aktualizace UI
+        function updateUI() {
+            // Celkový protein
+            const totalProtein = calculateTotalProtein();
+            document.getElementById('totalProtein').textContent = `${totalProtein.toFixed(1)}g`;
+            
+            // Seznam jídel
+            const mealsList = document.getElementById('mealsList');
+            const todaysMeals = getTodaysMeals();
+            
+            mealsList.innerHTML = todaysMeals.length > 0 ? 
+                '<h2 style="font-size: 18px; margin-bottom: 15px; padding-left: 5px;">Dnešní jídla</h2>' : '';
+            
+            todaysMeals.forEach(meal => {
+                const mealItem = document.createElement('div');
+                mealItem.className = 'meal-item';
+                mealItem.innerHTML = `
+                    <div class="meal-info">
+                        <h3>${meal.name}</h3>
+                        <p>${getCategoryName(meal.category)} • ${new Date(meal.timestamp).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="meal-protein">${meal.protein}g</div>
+                        <button class="delete-btn" onclick="deleteMeal(${meal.id})">Smazat</button>
+                    </div>
+                `;
+                mealsList.appendChild(mealItem);
+            });
+            
+            // Seznam doplňků
+            const supplementsList = document.getElementById('supplementsList');
+            const todaysSupplements = getTodaysSupplements();
+            
+            supplementsList.innerHTML = '';
+            
+            todaysSupplements.forEach(supp => {
+                const suppItem = document.createElement('div');
+                suppItem.className = 'supplement-item';
+                suppItem.innerHTML = `
+                    <div>
+                        <div class="supplement-name">${supp.name}</div>
+                        <div class="supplement-dose">${supp.dose}</div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteSupplement(${supp.id})">Smazat</button>
+                `;
+                supplementsList.appendChild(suppItem);
+            });
+            
+            // Tlačítko pro přidání doplňku
+            const addSuppBtn = document.createElement('button');
+            addSuppBtn.className = 'add-meal-btn';
+            addSuppBtn.style.padding = '10px 20px';
+            addSuppBtn.style.fontSize = '14px';
+            addSuppBtn.textContent = '+ Přidat doplněk';
+            addSuppBtn.onclick = openSupplementModal;
+            supplementsList.appendChild(addSuppBtn);
+        }
+
+        // Pomocná funkce pro názvy kategorií
+        function getCategoryName(category) {
+            const categories = {
+                breakfast: 'Snídaně',
+                lunch: 'Oběd',
+                dinner: 'Večeře',
+                snack: 'Svačina'
+            };
+            return categories[category] || category;
+        }
+
+        // Zabezpečení proti XSS útokům
+        function sanitizeInput(input) {
+            const div = document.createElement('div');
+            div.textContent = input;
+            return div.innerHTML;
+        }
+
+        // Placeholder funkce pro další sekce
+        function showHistory() {
+            alert('Historie bude brzy dostupná! 📊');
+        }
+
+        function showProfile() {
+            alert('Profil a nastavení budou brzy dostupné! ⚙️');
+        }
+
+        // Inicializace při načtení
+        window.addEventListener('load', () => {
+            loadData();
+            generateAIInsights();
+            
+            // Simulace zabezpečeného spojení
+            setInterval(() => {
+                const indicator = document.querySelector('.security-indicator');
+                if (indicator) {
+                    indicator.style.opacity = indicator.style.opacity === '0.5' ? '1' : '0.5';
+                }
+            }, 2000);
+        });
+
+        // PWA instalace
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        // Export/Import dat pro zálohování
+        function exportData() {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'protein-tracker-backup.json';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.meals && imported.supplements) {
+                        appData = imported;
+                        saveData();
+                        updateUI();
+                        generateAIInsights();
+                        alert('Data úspěšně importována!');
+                    }
+                } catch (err) {
+                    alert('Chyba při importu dat');
+                }
+            };
+            reader.readAsText(file);
+        }
